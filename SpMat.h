@@ -10,27 +10,31 @@
 
 #include <vector>
 
+class Vec;
+
 class SpMat
 {
 public:
 	struct entry
 	{
-		int i;
-		int j;
+		unsigned int i;
+		unsigned int j;
 		double val;
 	};
 
 public:
-	SpMat();
+	SpMat( unsigned int m, unsigned int n );
 	~SpMat();
 
-	void addEntry( int i, int j, double val );
-	const std::vector<entry>& getEntries();
+	void addEntry( unsigned int i, unsigned int j, double val );
+	const std::vector<entry>& getEntries() const;
+	void multiplyVector( const Vec& vec, Vec& res ) const;
+	void diag( double val, int offset );
 
 private:
 	std::vector<entry> entries;
-	int m;
-	int n;
+	unsigned int m;
+	unsigned int n;
 };
 
 #endif /* SPMAT_H_ */
