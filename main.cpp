@@ -6,6 +6,8 @@
  */
 
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <armadillo>
 #include <Python.h>
 #include "SerialSolver.h"
@@ -19,8 +21,20 @@ using namespace arma;
 template<typename T>
 T inputParam( const char* name, T defVal )
 {
-	std::cout << name << " (" << defVal << "): ";
+	std::cout << name << " [" << defVal << "]: ";
 	T val;
+	std::string input;
+	std::getline( std::cin, input );
+	if( !input.empty() )
+	{
+		std::istringstream stream( input );
+		stream >> val;
+	}
+	else
+	{
+		val = defVal;
+	}
+	/*
 	while( true )
 	{
 	    if( std::cin.peek() == '\n' )
@@ -41,6 +55,7 @@ T inputParam( const char* name, T defVal )
 			std::cin.clear();
 	    }
 	}
+	*/
 	return val;
 }
 
