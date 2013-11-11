@@ -6,26 +6,16 @@
  */
 
 #include <iostream>
-//#include <armadillo>
-#include "SpMat.h"
-#include "Vec.h"
+#include <armadillo>
+#include <Python.h>
+#include "SerialSolver.h"
+#include "Plotter.h"
+
+using namespace arma;
 
 /*
-void evalRhs(
-		arma::vec z,
-		arma::vec w,
-		arma::SpMat<double>& M,
-		double l2,
-		double dt2,
-		double a,
-		double b,
-		double c,
-		double d
-		arma::vec u )
-{
-}
+* Input helper function.
 */
-
 template<typename T>
 T inputParam( const char* name, T defVal )
 {
@@ -54,28 +44,82 @@ T inputParam( const char* name, T defVal )
 	return val;
 }
 
+/*
+* Initial value function.
+*/
+double funu0( double x )
+{
+	return 1 / ( 1 + x * x );
+}
+
+/*
+* Neumann boundary condition.
+*/
+double funu1( double x )
+{
+	return 0.0;
+}
+
+/*
+* Exact solution.
+*/
+double funsol( double x, double t )
+{
+	double a = x - t;
+	double b = x + t;
+	return ( 1 / ( 1 + a * a ) + 1 / ( 1 + b * b ) ) / 2.0;
+}
+
+void onReassociate(
+	unsigned int step,
+	unsigned int numSteps,
+	const arma::vec& x,
+	const arma::vec& numSol,
+	const arma::vec& exSol,
+	double error )
+{
+	std::cout << step + 1 << " / " << numSteps << " : " << error << std::endl;
+}
+
 int main( int argc, char* argv[] )
 {
+	Py_SetProgramName( (wchar_t*)argv[ 0 ] );
+	Py_Initialize();
+	Plotter::initialize();
+
+	//PyRun_SimpleString( "import numpy\n" );
+	//PyRun_SimpleString( "import matplotlib.pyplot as plt\nplt.plot([0,1,2],[2,0,5])\nplt.show()\n" );
+	//PyRun_SimpleString( "import sys\nprint(sys.getfilesystemencoding())" );
+
 	std::cout << "Enter input parameters." << std::endl;
+
+	// spacial domain size (spanning from -L to L)
 	double L = inputParam<double>( "L", 150.0 );
-	int N = inputParam<int>( "N", 14 );
-	int n = inputParam<int>( "n", 7 );
+	// spacial discretization point count exponent (number of points = 2^N)
+	unsigned int N = inputParam<unsigned int>( "N", 14 );
+	// processor count exponent (number of processes = 2^n)
+	unsigned int n = inputParam<unsigned int>( "n", 7 );
+	// temporal domain length
 	double T = inputParam<double>( "T", 100.0 );
 
-	SpMat M( 3, 3 );
-	M.diag( 2.0, 1 );
-	Vec v( 3 );
-	v.getValues()[ 0 ] = 1.0;
-	v.getValues()[ 1 ] = 2.0;
-	v.getValues()[ 2 ] = 3.0;
+	Solver& solver = *new SerialSolver();
+	// assign a function to be called on each reassociation (e.g. for plotting)
+	solver.onReassociation( onReassociate );
 
-	v.print();
+	arma::vec x;
+	arma::vec numSol;
+	arma::vec exSol;
+	arma::vec error;
+	solver.solve( L, N, n, T, funu0, funu1, funsol, x, numSol, &exSol, &error );
 
-	Vec w( 3 );
-	M.multiplyVector( v, w );
+	Plotter::plot( x, numSol );
 
-	w.print();
+	// require key-press to exit
+	std::cout << "Press Enter to exit." << std::endl;
+	std::cin.get();
 
+	Plotter::finalize();
+	Py_Finalize( );
 	return 0;
 }
 
