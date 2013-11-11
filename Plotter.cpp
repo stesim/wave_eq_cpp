@@ -17,11 +17,7 @@ Plotter::~Plotter()
 
 void Plotter::initialize()
 {
-	/*
-	PyObject* pyplotName = PyUnicode_FromString( "matplotlib" );
-	PyObject* matplotlib = PyImport_Import( pyplotName );
-	Py_DECREF( pyplotName );
-	pyplotName = PyUnicode_FromString( "matplotlib.pyplot" );
+	PyObject* pyplotName = PyUnicode_FromString( "matplotlib.pyplot" );
 	s_pymodPyplot = PyImport_Import( pyplotName );
 	if( PyErr_Occurred() != NULL )
 	{
@@ -32,26 +28,24 @@ void Plotter::initialize()
 
 	s_pyfunPlot = PyObject_GetAttrString( s_pymodPyplot, "plot" );
 	s_pyfunShow = PyObject_GetAttrString( s_pymodPyplot, "show" );
-	*/
 }
 
 void Plotter::finalize()
 {
-	/*
 	Py_XDECREF( s_pyfunShow );
 	Py_XDECREF( s_pyfunPlot );
 	Py_XDECREF( s_pymodPyplot );
-	*/
 }
 
 void Plotter::plot( arma::vec& x, arma::mat& y )
 {
+	/*
 	x.save( "plot_data_x.dat", arma::raw_ascii );
 	y.save( "plot_data_y.dat", arma::raw_ascii );
 
 	std::system( "python plot.py" );
+	*/
 
-	/*
 	PyObject* py_x = PyList_New( x.size() );
 	for( unsigned int i = 0; i < x.size(); ++i )
 	{
@@ -89,5 +83,4 @@ void Plotter::plot( arma::vec& x, arma::mat& y )
 	Py_DECREF( plotArgs );
 
 	PyObject_CallObject( s_pyfunShow, NULL );
-	*/
 }

@@ -12,6 +12,8 @@
 #include <Python.h>
 #include "SerialSolver.h"
 #include "Plotter.h"
+#include "WallTimer.h"
+#include "CpuTimer.h"
 
 using namespace arma;
 
@@ -34,28 +36,6 @@ T inputParam( const char* name, T defVal )
 	{
 		val = defVal;
 	}
-	/*
-	while( true )
-	{
-	    if( std::cin.peek() == '\n' )
-	    {
-	    	std::cin.get();
-
-	        val = defVal;
-	        break;
-	    }
-	    else if ( std::cin >> val )
-	    {
-	    	break;
-	    }
-	    else
-	    {
-	    	std::cout << "Invalid input." << std::endl;
-			std::cin.sync();
-			std::cin.clear();
-	    }
-	}
-	*/
 	return val;
 }
 
@@ -93,7 +73,9 @@ void onReassociate(
 	const arma::vec& exSol,
 	double error )
 {
-	std::cout << step + 1 << " / " << numSteps << " : " << error << std::endl;
+	std::cout << "k / kmax: " << step + 1 << " / " << numSteps
+		<< " (" << 100 * ( step + 1 ) / numSteps << "%) "
+		<< "; Current L2 error: " << error << std::endl;
 }
 
 int main( int argc, char* argv[] )
@@ -101,10 +83,6 @@ int main( int argc, char* argv[] )
 	Py_SetProgramName( (wchar_t*)argv[ 0 ] );
 	Py_Initialize();
 	Plotter::initialize();
-
-	//PyRun_SimpleString( "import numpy\n" );
-	//PyRun_SimpleString( "import matplotlib.pyplot as plt\nplt.plot([0,1,2],[2,0,5])\nplt.show()\n" );
-	//PyRun_SimpleString( "import sys\nprint(sys.getfilesystemencoding())" );
 
 	std::cout << "Enter input parameters." << std::endl;
 
@@ -121,17 +99,33 @@ int main( int argc, char* argv[] )
 	// assign a function to be called on each reassociation (e.g. for plotting)
 	solver.onReassociation( onReassociate );
 
+	WallTimer wallTimer;
+	CpuTimer cpuTimer;
+	
 	arma::vec x;
 	arma::vec numSol;
 	arma::vec exSol;
 	arma::vec error;
+
+	wallTimer.start();
+	cpuTimer.start();
+
 	solver.solve( L, N, n, T, funu0, funu1, funsol, x, numSol, &exSol, &error );
+
+	wallTimer.stop();
+	cpuTimer.stop();
+
+	std::cout << "Calculation completed in " << wallTimer.getElapsedTime()
+		<< "s wall time, or " << cpuTimer.getElapsedTime()
+		<< "s cpu time respectively." << std::endl;
 
 	Plotter::plot( x, numSol );
 
-	// require key-press to exit
+#ifdef WIN32
+	// require key-press to exit (Windows only)
 	std::cout << "Press Enter to exit." << std::endl;
 	std::cin.get();
+#endif
 
 	Plotter::finalize();
 	Py_Finalize( );
