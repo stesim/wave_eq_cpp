@@ -1,8 +1,15 @@
-import numpy;
-import matplotlib.pyplot as plt;
+import numpy
+import matplotlib.pyplot as plt
 
-x = numpy.fromfile("plot_data_x.dat",float,-1," ")
-y = numpy.fromfile("plot_data_y.dat",float,-1," ")
-
-plt.plot(x,y)
-plt.show()
+def plot(step,numSteps,x,numSol,exSol,error):
+	_numSol = numpy.array(numSol)
+	_exSol = numpy.array(exSol)
+	plt.subplot(2,1,1)
+	plt.plot(x,numSol,x,exSol)
+	plt.title("Numerical and analytical solution")
+	plt.xlabel("x")
+	plt.subplot(2,1,2)
+	plt.plot(error)
+	plt.title("L2 error")
+	plt.xlabel("t")
+	plt.show()

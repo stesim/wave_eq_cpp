@@ -57,6 +57,31 @@ protected:
 		double t,
 		arma::vec& val );
 
+	/*
+	* Calculate one time step.
+	*/
+	static void evalRhs(
+		const arma::vec& z,
+		const arma::vec& w,
+		const arma::sp_mat& M,
+		double l2,
+		double dt2,
+		double a,
+		double b,
+		double c,
+		arma::vec& u );
+
+	/*
+	* Calculate all time steps until next reassociation.
+	*/
+	static void evalMulti(
+		arma::vec*& pz,
+		arma::vec*& pw,
+		arma::sp_mat& M,
+		double l2,
+		double dt2,
+		unsigned int nsteps );
+
 protected:
 	ReassociationCallback m_funOnReassociation;
 };

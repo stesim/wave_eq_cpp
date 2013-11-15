@@ -1,17 +1,9 @@
-/*
- * main.cpp
- *
- *  Created on: Nov 5, 2013
- *      Author: stefan
- */
-
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <armadillo>
 #include <Python.h>
 #include "SerialSolver.h"
-#include "Plotter.h"
 #include "WallTimer.h"
 #include "CpuTimer.h"
 
@@ -65,6 +57,16 @@ double funsol( double x, double t )
 	return ( 1 / ( 1 + a * a ) + 1 / ( 1 + b * b ) ) / 2.0;
 }
 
+PyObject* pyListFromArmaVec( const arma::vec& vec )
+{
+	PyObject* list = PyList_New( vec.size() );
+	for( unsigned int i = 0; i < vec.size(); ++i )
+	{
+		PyList_SetItem( list, i, PyFloat_FromDouble( vec( i ) ) );
+	}
+	return list;
+}
+
 void onReassociate(
 	unsigned int step,
 	unsigned int numSteps,
@@ -74,15 +76,52 @@ void onReassociate(
 	double error )
 {
 	std::cout << "k / kmax: " << step + 1 << " / " << numSteps
-		<< " (" << 100 * ( step + 1 ) / numSteps << "%) "
+		<< " (" << 100 * ( step + 1 ) / numSteps << "%)"
 		<< "; Current L2 error: " << error << std::endl;
+}
+
+void plotResults(
+		const arma::vec& x,
+		const arma::vec& numSol,
+		const arma::vec& exSol,
+		const arma::vec& error )
+{
+	PyObject* px = pyListFromArmaVec( x );
+	PyObject* pnumSol = pyListFromArmaVec( numSol );
+	PyObject* pexSol = pyListFromArmaVec( exSol );
+	PyObject* perror = pyListFromArmaVec( error );
+	
+	PyObject* pyplotName = PyUnicode_FromString( "plot" );
+	PyObject* modPyplot = PyImport_Import( pyplotName );
+	if( PyErr_Occurred() != NULL )
+	{
+		PyErr_Print();
+		return;
+	}
+	Py_DECREF( pyplotName );
+
+	PyObject* funPlot = PyObject_GetAttrString( modPyplot, "plot" );
+	
+	PyObject* plotArgs = PyTuple_New( 6 );
+	PyTuple_SetItem( plotArgs, 0, PyLong_FromLong( 0 ) );
+	PyTuple_SetItem( plotArgs, 1, PyLong_FromLong( 0 ) );
+	PyTuple_SetItem( plotArgs, 2, px );
+	PyTuple_SetItem( plotArgs, 3, pnumSol );
+	PyTuple_SetItem( plotArgs, 4, pexSol );
+	PyTuple_SetItem( plotArgs, 5, perror );
+
+	PyObject_CallObject( funPlot, plotArgs );
+	Py_DECREF( plotArgs );
+	Py_DECREF( funPlot );
+	Py_DECREF( modPyplot );
 }
 
 int main( int argc, char* argv[] )
 {
+	// Python initialization
 	Py_SetProgramName( (wchar_t*)argv[ 0 ] );
 	Py_Initialize();
-	Plotter::initialize();
+	PyRun_SimpleString( "import sys\nsys.path.append(\".\")\n" );
 
 	std::cout << "Enter input parameters." << std::endl;
 
@@ -95,8 +134,9 @@ int main( int argc, char* argv[] )
 	// temporal domain length
 	double T = inputParam<double>( "T", 100.0 );
 
+	// initialize solver
 	Solver& solver = *new SerialSolver();
-	// assign a function to be called on each reassociation (e.g. for plotting)
+	// assign a function to be called on each reassociation
 	solver.onReassociation( onReassociate );
 
 	WallTimer wallTimer;
@@ -119,16 +159,18 @@ int main( int argc, char* argv[] )
 		<< "s wall time, or " << cpuTimer.getElapsedTime()
 		<< "s cpu time respectively." << std::endl;
 
-	Plotter::plot( x, numSol );
+	// plot results using python
+	plotResults( x, numSol, exSol, error );
 
-#ifdef WIN32
+#ifdef _WIN32
 	// require key-press to exit (Windows only)
 	std::cout << "Press Enter to exit." << std::endl;
 	std::cin.get();
 #endif
 
-	Plotter::finalize();
-	Py_Finalize( );
+	Py_Finalize();
+
+	delete &solver;
 	return 0;
 }
 

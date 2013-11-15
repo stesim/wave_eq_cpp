@@ -64,7 +64,7 @@ void SerialSolver::solve(
 	vec w( f );
 	// calculate one step back in time
 	vec z( np );
-	evalRhs( f, g, M, l2, dt2, 1.0, 0.5, -dt, 0.5, z );
+	evalRhs( f, g, M, l2, dt2, 1.0, 0.5, -dt, z );
 
 	// use ONLY pointer to vectors from now on to be able to swap efficiently!
 	vec* pw = &w;
@@ -72,7 +72,7 @@ void SerialSolver::solve(
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
 		evalMulti( pz, pw, M, l2, dt2, nsteps );
-		arrayfun2( funsol, x, k * nsteps * dt, exSol );
+		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
 		// *pz == z is not necessarily true, thus the solution vector is *pz
 		vec error = *pz - exSol;
 		errorL2( k ) = sqrt( h * dot( error, error ) );
@@ -92,44 +92,5 @@ void SerialSolver::solve(
 	if( error != NULL )
 	{
 		*error = errorL2;
-	}
-}
-
-/*
-* Calculate one time step.
-*/
-void SerialSolver::evalRhs(
-	const vec& z,
-	const vec& w,
-	const sp_mat& M,
-	double l2,
-	double dt2,
-	double a,
-	double b,
-	double c,
-	double d,
-	vec& u )
-{
-	u = a * ( 1 - l2 ) * z + b * M * z - c * w;
-}
-
-/*
-* Calculate all time steps until next reassociation.
-*/
-void SerialSolver::evalMulti(
-	vec*& pz,
-	vec*& pw,
-	sp_mat& M,
-	double l2,
-	double dt2,
-	unsigned int nsteps )
-{
-	vec* swap;
-	for( unsigned int k = 0; k < nsteps; ++k )
-	{
-		evalRhs( *pz, *pw, M, l2, dt2, 2.0, 1.0, 1.0, 1.0, *pw );
-		swap = pw;
-		pw = pz;
-		pz = swap;
 	}
 }
