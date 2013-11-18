@@ -2,11 +2,11 @@
 
 #include "Solver.h"
 
-class SerialSolver : public Solver
+class ParallelSolver : public Solver
 {
 public:
-	SerialSolver();
-	virtual ~SerialSolver();
+	ParallelSolver();
+	virtual ~ParallelSolver();
 
 	virtual void solve(
 		double L,
@@ -25,6 +25,10 @@ private:
 	/*
 	* Generate the finite differences matrix with split off main diagonal.
 	*/
-	static arma::sp_mat genFDMatrix( unsigned int np );
+	static void genFDMatrices(
+			unsigned int np,
+			double l2,
+			arma::sp_mat& left,
+			arma::sp_mat& center,
+			arma::sp_mat& right );
 };
-

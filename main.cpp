@@ -4,8 +4,10 @@
 #include <armadillo>
 #include <Python.h>
 #include "SerialSolver.h"
+#include "ParallelSolver.h"
 #include "WallTimer.h"
 #include "CpuTimer.h"
+#include <thread>
 
 using namespace arma;
 
@@ -133,9 +135,12 @@ int main( int argc, char* argv[] )
 	unsigned int n = inputParam<unsigned int>( "n", 7 );
 	// temporal domain length
 	double T = inputParam<double>( "T", 100.0 );
+	// solver type
+	bool useParallelSolver = inputParam<bool>( "useParallelSolver", true );
 
 	// initialize solver
-	Solver& solver = *new SerialSolver();
+	Solver& solver = *( useParallelSolver
+			? (Solver*)new ParallelSolver() : (Solver*)new SerialSolver() );
 	// assign a function to be called on each reassociation
 	solver.onReassociation( onReassociate );
 

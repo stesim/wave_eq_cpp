@@ -36,11 +36,6 @@ public:
 
 protected:
 	/*
-	* Generate the finite differences matrix with split off main diagonal.
-	*/
-	static arma::sp_mat genFDMatrix( unsigned int np );
-
-	/*
 	* Evaluate function at multiple points.
 	*/
 	static void arrayfun(
