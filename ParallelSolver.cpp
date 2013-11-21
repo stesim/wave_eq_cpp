@@ -126,7 +126,7 @@ void ParallelSolver::solve(
 	numSol = vec( np );
 
 	// allocate thread array
-	std::thread* threads = new std::thread[ 1 << n ];
+	std::thread* threads = new std::thread[ ndom ];
 
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
@@ -142,7 +142,6 @@ void ParallelSolver::solve(
 				nsteps );
 		for( unsigned int i = 1; i < ndom - 1; ++i )
 		{
-			std::cout << "Starting thread " << i << " of " << ndom << std::endl;
 			threads[ i ] = std::thread(
 					evalMulti,
 					std::ref( PZ[ i ] ),
@@ -161,12 +160,9 @@ void ParallelSolver::solve(
 				dt2,
 				nsteps );
 
-		std::cout << ndom << " threads started." << std::endl;
-
 		// wait for all threads to complete
 		for( unsigned int i = 0; i < ndom; ++i )
 		{
-			std::cout << "Join thread " << i << std::endl;
 			threads[ i ].join();
 		}
 

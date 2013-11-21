@@ -1,37 +1,16 @@
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <armadillo>
 #include <Python.h>
 #include "SerialSolver.h"
 #include "ParallelSolver.h"
+#include "OpenClSolver.h"
 #include "WallTimer.h"
 #include "CpuTimer.h"
 #include <thread>
+#include "InputHelper.h"
 
 using namespace arma;
-
-/*
-* Input helper function.
-*/
-template<typename T>
-T inputParam( const char* name, T defVal )
-{
-	std::cout << name << " [" << defVal << "]: ";
-	T val;
-	std::string input;
-	std::getline( std::cin, input );
-	if( !input.empty() )
-	{
-		std::istringstream stream( input );
-		stream >> val;
-	}
-	else
-	{
-		val = defVal;
-	}
-	return val;
-}
 
 /*
 * Initial value function.
