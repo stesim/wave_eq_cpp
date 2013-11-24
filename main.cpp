@@ -142,8 +142,11 @@ int main( int argc, char* argv[] )
 		<< "s wall time, or " << cpuTimer.getElapsedTime()
 		<< "s cpu time respectively." << std::endl;
 
-	// plot results using python
-	plotResults( x, numSol, exSol, error );
+	if( inputParam<bool>( "Plot results?", false ) )
+	{
+		// plot results using python
+		plotResults( x, numSol, exSol, error );
+	}
 
 #ifdef _WIN32
 	// require key-press to exit (Windows only)
