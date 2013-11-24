@@ -4,7 +4,6 @@
 #include <Python.h>
 #include "SerialSolver.h"
 #include "ParallelSolver.h"
-#include "OpenClSolver.h"
 #include "WallTimer.h"
 #include "CpuTimer.h"
 #include <thread>
