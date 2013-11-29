@@ -1,10 +1,13 @@
 #include "ParallelSolver.h"
-#include <vector>
-#include <thread>
 
 using namespace arma;
 
+unsigned int ParallelSolver::s_uiDefaultNumThreads(
+		std::thread::hardware_concurrency() > 0
+			? std::thread::hardware_concurrency() : 4 );
+
 ParallelSolver::ParallelSolver()
+	: m_uiNumThreads( s_uiDefaultNumThreads )
 {
 }
 
@@ -36,13 +39,6 @@ void ParallelSolver::solve(
 	unsigned int ip = np / ns;
 	// time steps between solution reassociations
 	unsigned int nsteps = ip / 2;
-
-	unsigned int threadsSupported = std::thread::hardware_concurrency();
-	if( threadsSupported > 0 && ndom > threadsSupported )
-	{
-		std::cout << "WARNING: Number of used threads is greater than "
-			"physically supported (" << threadsSupported << ")." << std::endl;
-	}
 
 	// spacial discretization
 	x = linspace( -L, L, np );
@@ -125,46 +121,31 @@ void ParallelSolver::solve(
 
 	numSol = vec( np );
 
-	// allocate thread array
-	std::thread* threads = new std::thread[ ndom ];
+	// allocate threads
+	std::vector<std::thread> threads( ndom );
+	// generate parameters
+	std::vector<Params> params( ndom );
+	for( unsigned int i = 0; i < params.size(); ++i )
+	{
+		Params& p = params[ i ];
+		p.PZ = &PZ[ i ];
+		p.PW = &PW[ i ];
+		p.M = &Mi;
+		p.l2 = l2;
+		p.dt2 = dt2;
+		p.nsteps = nsteps;
+	}
+	params[ 0 ].M = &Ml;
+	params[ ndom - 1 ].M = &Mr;
 
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
 		// calculate as many time steps as possible before reassociating
 		// start a thread for each calculation
-		threads[ 0 ] = std::thread(
-				evalMulti,
-				std::ref( PZ[ 0 ] ),
-				std::ref( PW[ 0 ] ),
-				std::ref( Ml ),
-				l2,
-				dt2,
-				nsteps );
-		for( unsigned int i = 1; i < ndom - 1; ++i )
-		{
-			threads[ i ] = std::thread(
-					evalMulti,
-					std::ref( PZ[ i ] ),
-					std::ref( PW[ i ] ),
-					std::ref( Mi ),
-					l2,
-					dt2,
-					nsteps );
-		}
-		threads[ ndom - 1 ] = std::thread(
-				evalMulti,
-				std::ref( PZ[ ndom - 1 ] ),
-				std::ref( PW[ ndom - 1 ] ),
-				std::ref( Mr ),
-				l2,
-				dt2,
-				nsteps );
+		startThreads( threads, params );
 
 		// wait for all threads to complete
-		for( unsigned int i = 0; i < ndom; ++i )
-		{
-			threads[ i ].join();
-		}
+		joinThreads( threads );
 
 		// reassociate numerical solution
 		numSol.subvec( 0, ip * 3 / 4 - 1 ) =
@@ -227,7 +208,6 @@ void ParallelSolver::solve(
 	delete[] F;
 	delete[] G;
 	delete[] X;
-	delete[] threads;
 }
 
 void ParallelSolver::genFDMatrices(
@@ -285,4 +265,61 @@ void ParallelSolver::genFDMatrices(
 		values( 2 * i + 1 ) = ( i == np - 2 ) ? 2 * l2 : l2;
 	}
 	right = sp_mat( locations, values, np, np, true );
+}
+
+void ParallelSolver::startThreads(
+		std::vector<std::thread>& threads,
+		std::vector<Params>& jobQueue )
+{
+	unsigned int n = 0;
+	std::mutex mutex;
+	for( unsigned int i = 0; i < threads.size(); ++i )
+	{
+		threads[ i ] = std::thread(
+				&ParallelSolver::threadJob,
+				this,
+				std::ref( jobQueue ),
+				std::ref( n ),
+				std::ref( mutex ) );
+	}
+}
+
+void ParallelSolver::threadJob(
+		std::vector<Params>& jobQueue,
+		unsigned int& curJob,
+		std::mutex& mutex )
+{
+	while( true )
+	{
+		// lock mutex to retrieve and increment current job index
+		mutex.lock();
+		unsigned int n = curJob++;
+		mutex.unlock();
+
+		// terminate thread if all jobs have been assigned
+		if( curJob >= jobQueue.size() )
+		{
+			return;
+		}
+
+		// retrieve job parameters
+		Params& params = jobQueue[ n ];
+
+		// solve with retrieved parameters
+		evalMulti(
+				*params.PZ,
+				*params.PW,
+				*params.M,
+				params.l2,
+				params.dt2,
+				params.nsteps );
+	}
+}
+
+void ParallelSolver::joinThreads( std::vector<std::thread>& threads )
+{
+	for( unsigned int i = 0; i < threads.size(); ++i )
+	{
+		threads[ i ].join();
+	}
 }
