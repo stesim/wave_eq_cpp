@@ -5,7 +5,6 @@
 OpenClContext::OpenClContext()
 	: context( NULL ),
 	device( NULL ),
-	kernel( NULL ),
 	queue( NULL ),
 	m_bInitialized( false )
 {
@@ -136,7 +135,7 @@ void OpenClContext::initialize()
 	// kernel source file
 	const char* source = "#include \"kernel.cl\"";
 
-	cl_program program = clCreateProgramWithSource(
+	program = clCreateProgramWithSource(
 			context,
 			1,
 			&source,
@@ -174,14 +173,6 @@ void OpenClContext::initialize()
 		return;
 	}
 
-	// create kernel
-	kernel = clCreateKernel( program, "wave_eq_cl", &err );
-	if( err != CL_SUCCESS )
-	{
-		std::cout << "Unable to initialize OpenCL kernel." << std::endl;
-		finalize();
-		return;
-	}
 
 	queue = clCreateCommandQueue( context, device, 0, NULL );
 }
@@ -198,10 +189,10 @@ void OpenClContext::finalize()
 		clReleaseCommandQueue( queue );
 		queue = NULL;
 	}
-	if( kernel != NULL )
+	if( program != NULL )
 	{
-		clReleaseKernel( kernel );
-		kernel = NULL;
+		clReleaseProgram( program );
+		program = NULL;
 	}
 	if( device != NULL )
 	{

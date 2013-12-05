@@ -17,7 +17,7 @@ public:
 public:
 	cl_context context;
 	cl_device_id device;
-	cl_kernel kernel;
+	cl_program program;
 	cl_command_queue queue;
 
 private:

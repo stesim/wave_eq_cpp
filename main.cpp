@@ -8,34 +8,13 @@
 #include "CpuTimer.h"
 #include <thread>
 #include "InputHelper.h"
+#include "wave_eq_func.h"
+
+#ifndef NO_CL
+#include "OpenClSolver.h"
+#endif
 
 using namespace arma;
-
-/*
-* Initial value function.
-*/
-double funu0( double x )
-{
-	return 1 / ( 1 + x * x );
-}
-
-/*
-* Neumann boundary condition.
-*/
-double funu1( double x )
-{
-	return 0.0;
-}
-
-/*
-* Exact solution.
-*/
-double funsol( double x, double t )
-{
-	double a = x - t;
-	double b = x + t;
-	return ( 1 / ( 1 + a * a ) + 1 / ( 1 + b * b ) ) / 2.0;
-}
 
 PyObject* pyListFromArmaVec( const arma::vec& vec )
 {
@@ -99,7 +78,7 @@ void plotResults(
 int main( int argc, char* argv[] )
 {
 	// Python initialization
-	Py_SetProgramName( (wchar_t*)argv[ 0 ] );
+	Py_SetProgramName( reinterpret_cast<wchar_t*>( argv[ 0 ] ) );
 	Py_Initialize();
 	PyRun_SimpleString( "import sys\nsys.path.append(\".\")\n" );
 
@@ -117,8 +96,15 @@ int main( int argc, char* argv[] )
 	bool useParallelSolver = inputParam<bool>( "useParallelSolver", true );
 
 	// initialize solver
+#ifndef NO_CL
 	Solver& solver = *( useParallelSolver
-			? (Solver*)new ParallelSolver() : (Solver*)new SerialSolver() );
+			? static_cast<Solver*>( new OpenClSolver() )
+			: static_cast<Solver*>( new SerialSolver() ) );
+#else
+	Solver& solver = *( useParallelSolver
+			? static_cast<Solver*>( new ParallelSolver() )
+			: static_cast<Solver*>( new SerialSolver() ) );
+#endif
 	// assign a function to be called on each reassociation
 	solver.onReassociation( onReassociate );
 
