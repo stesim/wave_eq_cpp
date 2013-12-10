@@ -1,6 +1,8 @@
 #include "CudaSolver.h"
 #include "CudaHelper.h"
-#include "wave_eq_func.h"
+//#include "wave_eq_func.h"
+
+#include <iostream>
 
 CudaSolver::CudaSolver()
 {
