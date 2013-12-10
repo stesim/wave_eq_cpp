@@ -194,10 +194,12 @@ void OpenClSolver::solve(
 				p_clZ = &_clU;
 				p_clW = &_clZ;
 				p_clU = &_clW;
+				break;
 			case 2:
 				p_clZ = &_clW;
 				p_clW = &_clU;
 				p_clU = &_clZ;
+				break;
 		}
 
 		// set reassociation arguments

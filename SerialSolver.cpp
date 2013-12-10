@@ -69,13 +69,14 @@ void SerialSolver::solve(
 	// use ONLY pointer to vectors from now on to be able to swap efficiently!
 	vec* pw = &w;
 	vec* pz = &z;
+	vec errorVec( np );
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
 		evalMulti( pz, pw, M, l2, dt2, nsteps );
 		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
 		// *pz == z is not necessarily true, thus the solution vector is *pz
-		vec error = *pz - exSol;
-		errorL2( k ) = sqrt( h * dot( error, error ) );
+		errorVec = *pz - exSol;
+		errorL2( k ) = sqrt( h * dot( errorVec, errorVec ) );
 
 		if( m_funOnReassociation != NULL )
 		{

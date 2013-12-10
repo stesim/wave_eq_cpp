@@ -1,9 +1,16 @@
 #pragma once
 
+#ifdef RUNTIME_CUDA
+#define __FUNC_MODIFIER__ __device__
+#else
+#define __FUNC_MODIFIER__ inline
+#endif
+
 /*
 * Initial value function.
 */
-inline double funu0( double x )
+__FUNC_MODIFIER__
+double funu0( double x )
 {
 	return 1 / ( 1 + x * x );
 }
@@ -11,7 +18,8 @@ inline double funu0( double x )
 /*
 * Neumann boundary condition.
 */
-inline double funu1( double x )
+__FUNC_MODIFIER__
+double funu1( double x )
 {
 	return 0.0;
 }
@@ -19,7 +27,8 @@ inline double funu1( double x )
 /*
 * Exact solution.
 */
-inline double funsol( double x, double t )
+__FUNC_MODIFIER__
+double funsol( double x, double t )
 {
 	double a = x - t;
 	double b = x + t;

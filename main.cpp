@@ -14,6 +14,10 @@
 #include "OpenClSolver.h"
 #endif
 
+#ifndef NO_CUDA
+#include "CudaSolver.h"
+#endif
+
 using namespace arma;
 
 PyObject* pyListFromArmaVec( const arma::vec& vec )
@@ -96,7 +100,11 @@ int main( int argc, char* argv[] )
 	bool useParallelSolver = inputParam<bool>( "useParallelSolver", true );
 
 	// initialize solver
-#ifndef NO_CL
+#ifndef NO_CUDA
+	Solver& solver = *( useParallelSolver
+			? static_cast<Solver*>( new CudaSolver() )
+			: static_cast<Solver*>( new SerialSolver() ) );
+#elif !defined(NO_CL)
 	Solver& solver = *( useParallelSolver
 			? static_cast<Solver*>( new OpenClSolver() )
 			: static_cast<Solver*>( new SerialSolver() ) );

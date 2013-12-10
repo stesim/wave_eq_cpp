@@ -7,6 +7,8 @@ CXX = g++
 # - the rule to link a single object file.
 CC = gcc
 
+NVCC = nvcc
+
 # Preprocessor flags
 CPPFLAGS = -I/usr/include/python3.3m -pthread
 			# -DNDEBUG when the debugging code as given in section 8.3
@@ -33,7 +35,7 @@ CXXFLAGS = $(WARNCXXFLAGS) $(DBGCXXFLAGS) $(OPTCXXFLAGS)
 # The linker flags and the libraries to link against.
 # These are used in the implicit rule for linking using a single object file;
 # we'll use them in our link rule too.
-LDFLAGS = -larmadillo -lpython3.3m -lOpenCL # -g
+LDFLAGS = -larmadillo -lpython3.3m -lOpenCL -locelot# -g
 # Use Electric Fence to track down memory allocation problems.
 LOADLIBES = # -lefence
 
@@ -47,6 +49,8 @@ SOURCES = $(wildcard *.cpp)
 # And the corresponding .o files
 OBJECTS = $(SOURCES:.cpp=.o)
 
+NVSOURCES = CudaHelper.cu
+NVFLAGS = -I/opt/cuda/include -locelot -arch=sm_20
 
 # The first target in the makefile is the default target. It's usually called
 # "all".
@@ -55,11 +59,12 @@ all:	depend $(PROGRAMS)
 # We assume we have one program (`ourprogram') to build, from all the object
 # files derived from .cc files in the current directory.
 $(MYPROGRAM):	$(OBJECTS)
-	$(CXX) $(LDFLAGS) -o $(MYPROGRAM) $(OBJECTS) $(LOADLIBES)
+	$(NVCC) -o nvobject.o $(NVFLAGS) -c $(NVSOURCES)
+	$(CXX) $(LDFLAGS) -o $(MYPROGRAM) $(OBJECTS) nvobject.o $(LOADLIBES)
 
 # "clean" removes files not needed after a build.
 clean:
-	rm -f $(OBJECTS)
+	rm -f $(OBJECTS) nvobject.o
 
 # "realclean" removes everything that's been built.
 realclean: clean

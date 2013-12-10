@@ -201,25 +201,25 @@ __kernel void wave_eq_reassociate(
 	}
 	else
 	{
-		left_index = vec_index - 1;
-		right_index = vec_index + 1;
+		left_index = id - 1;
+		right_index = id + 1;
 	}
 
 	// Copy exact data from left neighbors
-	__global double* nz = &Z[ left_index ];
-	__global double* nw = &W[ left_index ];
+	__global double* nz = &Z[ left_index * ip ];
+	__global double* nw = &W[ right_index * ip ];
 	for( unsigned int i = 0; i < ip / 4; ++i )
 	{
 		z[ i ] = nz[ ip / 2 + i ];
 		w[ i ] = nw[ ip / 2 + i ];
 	}
 	// Copy exact data from right neighbors
-	nz = &Z[ right_index ];
-	nw = &W[ right_index ];
+	nz = &Z[ right_index * ip ];
+	nw = &W[ right_index * ip ];
 	for( unsigned int i = 0; i < ip / 4; ++i )
 	{
 		z[ ip * 3 / 4 + i ] = nz[ ip / 4 + i ];
-		w[ ip * 3 / 4 + i ] = nz[ ip / 4 + i ];
+		w[ ip * 3 / 4 + i ] = nw[ ip / 4 + i ];
 	}
 
 	// Copy originally exact part to the complete solution.

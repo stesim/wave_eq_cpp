@@ -1,4 +1,6 @@
 #include "CudaSolver.h"
+#include "CudaHelper.h"
+#include "wave_eq_func.h"
 
 CudaSolver::CudaSolver()
 {
@@ -52,53 +54,141 @@ void CudaSolver::solve(
 	std::vector<int> fdOffsets;
 	std::vector<double> fdValues;
 	createSparseDiagFDMatrix( ip, l2, fdOffsets, fdValues );
+	unsigned int fdDiags = fdOffsets.size();
 
+	// allocate memory fot the numerical solution
+	numSol = arma::vec( np );
 	// allocate memory for the analytical solution
 	arma::vec exSol( np );
 	// allocate memory for error values
 	arma::vec errorL2( kmax );
 
-	// allocate memory for Z, W, U vectors, used for the solution
-	std::vector<double> Z( ndom * ip );
-	std::vector<double> W( ndom * ip );
-	std::vector<double> U( ndom * ip );
+	// allocate arrays required by the kernels on device memory
+	int* d_fdOffsets = CudaHelper::allocDevMem<int>( fdOffsets.size() );
+	double* d_fdValues = CudaHelper::allocDevMem<double>( fdValues.size() );
+	double* d_Z = CudaHelper::allocDevMem<double>( ndom * ip );
+	double* d_W = CudaHelper::allocDevMem<double>( ndom * ip );
+	double* d_U = CudaHelper::allocDevMem<double>( ndom * ip );
+	double* d_numSol = CudaHelper::allocDevMem<double>( numSol.n_elem );
 
-	// initialize arrays allocated above
-	for( unsigned int i = 0; i < ndom; ++i )
+	// copy FD matrix to device memory
+	CudaHelper::copyHostToDevMem( &fdOffsets[ 0 ], d_fdOffsets, fdOffsets.size() );
+	CudaHelper::copyHostToDevMem( &fdValues[ 0 ], d_fdValues, fdValues.size() );
+	// free FD matrix host memory
+	fdOffsets.clear();
+	fdValues.clear();
+
+	// TODO: find optimal values
+	unsigned int blocks = 32;
+	unsigned int threads = ndom / blocks;
+
+	// calculate initial values on the CUDA device
+	CudaHelper::callInitKernel(
+			blocks,
+			threads,
+			ip,
+			L,
+			h,
+			dt,
+			fdDiags,
+			d_fdOffsets,
+			d_fdValues,
+			d_Z,
+			d_W,
+			d_U );
+	errorL2( 0 ) = 0.0;
+
+	for( unsigned int k = 0; k < kmax; ++k )
 	{
-		// calculate values for F, G
-		F[ i ] = vec( ip );
-		arrayfun( funu0, X[ i ], F[ i ] );
-		G[ i ] = vec( ip );
-		arrayfun( funu1, X[ i ], G[ i ] );
+		// calculate 'nsteps' iterations
+		CudaHelper::callMainKernel(
+				blocks,
+				threads,
+				ip,
+				nsteps,
+				l2,
+				fdDiags,
+				d_fdOffsets,
+				d_fdValues,
+				d_Z,
+				d_W,
+				d_U );
 
-		// assign initial values to W, Z
-		W[ i ] = F[ i ];
-		Z[ i ] = vec( ip );
+		// shuffle the buffers to mirror the shuffling inside the kernel
+		double* swap;
+		switch( nsteps % 3 )
+		{
+			case 1:
+				swap = d_W;
+				d_Z = d_U;
+				d_W = d_Z;
+				d_U = swap;
+				break;
+			case 2:
+				swap = d_Z;
+				d_Z = d_W;
+				d_W = d_U;
+				d_U = swap;
+				break;
+		}
 
-		// get pointers to solution vectors
-		PW[ i ] = &W[ i ];
-		PZ[ i ] = &Z[ i ];
+		// synchronize the solutions (exchange numerically exact parts)
+		CudaHelper::callSyncKernel(
+				blocks,
+				threads,
+				ip,
+				d_Z,
+				d_W );
+
+		// reassociate the solutions
+		CudaHelper::callReassociationKernel(
+				blocks,
+				threads,
+				ip,
+				d_Z,
+				d_numSol );
+
+		// copy the solution to host memory
+		CudaHelper::copyDevToHostMem(
+				d_numSol,
+				numSol.memptr(),
+				numSol.n_elem );
+
+		// calculate exact solution
+		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
+
+		// calculate current L2 error
+		double err = 0.0;
+		for( unsigned int i = 0; i < exSol.size(); ++i )
+		{
+			double locErr = numSol( i ) - exSol( i );
+			err += locErr * locErr;
+		}
+		errorL2( k ) = sqrt( h * err );
+
+		if( m_funOnReassociation != NULL )
+		{
+			m_funOnReassociation( k, kmax, x, numSol, exSol, errorL2( k ) );
+		}
 	}
 
-	// calculate one step back in time
-	evalRhs( F[ 0 ], G[ 0 ], Ml, l2, dt2, 1.0, 0.5, -dt, Z[ 0 ] );
-	for( unsigned int i = 1; i < ndom - 1; ++i )
+	// return analytical solution and L2 error if necessary
+	if( exactSol != NULL )
 	{
-		evalRhs( F[ i ], G[ i ], Mi, l2, dt2, 1.0, 0.5, -dt, Z[ i ] );
+		*exactSol = exSol;
 	}
-	evalRhs(
-			F[ ndom - 1 ],
-			G[ ndom - 1 ],
-			Mr,
-			l2,
-			dt2,
-			1.0,
-			0.5,
-			-dt,
-			Z[ ndom - 1 ] );
+	if( error != NULL )
+	{
+		*error = errorL2;
+	}
 
-	numSol = vec( np );
+	// free device resources
+	CudaHelper::freeDevMem( d_fdOffsets );
+	CudaHelper::freeDevMem( d_fdValues );
+	CudaHelper::freeDevMem( d_Z );
+	CudaHelper::freeDevMem( d_W );
+	CudaHelper::freeDevMem( d_U );
+	CudaHelper::freeDevMem( d_numSol );
 }
 
 void CudaSolver::createSparseDiagFDMatrix(
