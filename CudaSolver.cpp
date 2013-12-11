@@ -99,6 +99,7 @@ void CudaSolver::solve(
 			d_W,
 			d_U );
 	errorL2( 0 ) = 0.0;
+	arma::vec errorVec( np );
 
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
@@ -160,6 +161,7 @@ void CudaSolver::solve(
 		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
 
 		// calculate current L2 error
+		/*
 		double err = 0.0;
 		for( unsigned int i = 0; i < exSol.size(); ++i )
 		{
@@ -167,6 +169,9 @@ void CudaSolver::solve(
 			err += locErr * locErr;
 		}
 		errorL2( k ) = sqrt( h * err );
+		*/
+		errorVec = numSol - exSol;
+		errorL2( k ) = sqrt( h * arma::dot( errorVec, errorVec ) );
 
 		if( m_funOnReassociation != NULL )
 		{

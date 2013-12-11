@@ -35,7 +35,7 @@ CXXFLAGS = $(WARNCXXFLAGS) $(DBGCXXFLAGS) $(OPTCXXFLAGS)
 # The linker flags and the libraries to link against.
 # These are used in the implicit rule for linking using a single object file;
 # we'll use them in our link rule too.
-LDFLAGS = -larmadillo -lpython3.3m -lOpenCL -locelot# -g
+LDFLAGS = -L/opt/cuda/lib64 -larmadillo -lpython3.3m -lOpenCL -lcudart# -g
 # Use Electric Fence to track down memory allocation problems.
 LOADLIBES = # -lefence
 
@@ -50,7 +50,7 @@ SOURCES = $(wildcard *.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 
 NVSOURCES = CudaHelper.cu
-NVFLAGS = -I/opt/cuda/include -locelot -arch=sm_20
+NVFLAGS = -I/opt/cuda/include -lcudart -arch=sm_20
 
 # The first target in the makefile is the default target. It's usually called
 # "all".
