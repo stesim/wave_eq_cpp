@@ -100,21 +100,40 @@ int main( int argc, char* argv[] )
 	bool useParallelSolver = inputParam<bool>( "useParallelSolver", true );
 
 	// initialize solver
-#ifndef NO_CUDA
-	Solver& solver = *( useParallelSolver
-			? static_cast<Solver*>( new CudaSolver() )
-			: static_cast<Solver*>( new SerialSolver() ) );
+	Solver* solver;
+	if( !useParallelSolver )
+	{
+		solver = new SerialSolver();
+	}
+	else
+	{
+#if !defined(NO_CUDA) || !defined(NO_CL)
+		// device type
+		bool useGpu = inputParam<bool>( "useGpu", false );
+		if( useGpu )
+		{
+#if !defined(NO_CUDA) && !defined(NO_CL)
+			bool useCuda = inputParam<bool>( "useCuda", true );
+			solver = useCuda
+				? static_cast<Solver*>( new CudaSolver() )
+				: static_cast<Solver*>( new OpenClSolver() );
 #elif !defined(NO_CL)
-	Solver& solver = *( useParallelSolver
-			? static_cast<Solver*>( new OpenClSolver() )
-			: static_cast<Solver*>( new SerialSolver() ) );
+			solver = new CudaSolver();
 #else
-	Solver& solver = *( useParallelSolver
-			? static_cast<Solver*>( new ParallelSolver() )
-			: static_cast<Solver*>( new SerialSolver() ) );
+			solver = new OpenClSolver();
 #endif
+		}
+		else
+		{
+			solver = new ParallelSolver();
+		}
+#else
+		solver = new ParallelSolver();
+#endif
+	}
+
 	// assign a function to be called on each reassociation
-	solver.onReassociation( onReassociate );
+	solver->onReassociation( onReassociate );
 
 	WallTimer wallTimer;
 	CpuTimer cpuTimer;
@@ -127,7 +146,18 @@ int main( int argc, char* argv[] )
 	wallTimer.start();
 	cpuTimer.start();
 
-	solver.solve( L, N, n, T, funu0, funu1, funsol, x, numSol, &exSol, &error );
+	solver->solve(
+			L,
+			N,
+			n,
+			T,
+			funu0,
+			funu1,
+			funsol,
+			x,
+			numSol,
+			&exSol,
+			&error );
 
 	wallTimer.stop();
 	cpuTimer.stop();
@@ -150,7 +180,7 @@ int main( int argc, char* argv[] )
 
 	Py_Finalize();
 
-	delete &solver;
+	delete solver;
 	return 0;
 }
 

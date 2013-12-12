@@ -1,13 +1,10 @@
 #include "ParallelSolver.h"
+#include "ThreadPool.h"
+#include <vector>
 
 using namespace arma;
 
-unsigned int ParallelSolver::s_uiDefaultNumThreads(
-		std::thread::hardware_concurrency() > 0
-			? std::thread::hardware_concurrency() : 4 );
-
 ParallelSolver::ParallelSolver()
-	: m_uiNumThreads( s_uiDefaultNumThreads )
 {
 }
 
@@ -41,11 +38,11 @@ void ParallelSolver::solve(
 	unsigned int nsteps = ip / 2;
 
 	// spacial discretization
-	x = linspace( -L, L, np );
+	x = arma::linspace( -L, L, np );
 	// discretization spacing
 	double h = 2.0 * L / ( np - 1 );
 	// overlapping intervals
-	vec* X = new vec[ ndom ];
+	std::vector<arma::vec> X( ndom );
 	for( unsigned int i = 0; i < ndom; ++i )
 	{
 		X[ i ] = x.subvec( ip * i / 2, ip * ( i + 2 ) / 2 - 1 );
@@ -63,26 +60,26 @@ void ParallelSolver::solve(
 		static_cast<unsigned int>( ceil( T / ( nsteps * dt ) ) );
 
 	// generate finite differences matrices
-	sp_mat Ml;
-	sp_mat Mi;
-	sp_mat Mr;
+	arma::sp_mat Ml;
+	arma::sp_mat Mi;
+	arma::sp_mat Mr;
 	genFDMatrices( ip, l2, Ml, Mi, Mr );
 
 	// allocate memory for the analytical solution
-	vec exSol( np );
+	arma::vec exSol( np );
 	// allocate memory for error values
-	vec errorL2( kmax );
+	arma::vec errorL2( kmax );
 
 	// initial values / boundary conditions
-	vec* F = new vec[ ndom ];
-	vec* G = new vec[ ndom ];
+	std::vector<arma::vec> F( ndom );
+	std::vector<arma::vec> G( ndom );
 
-	vec* W = new vec[ ndom ];
-	vec* Z = new vec[ ndom ];
+	std::vector<arma::vec> W( ndom );
+	std::vector<arma::vec> Z( ndom );
 
 	// use pointers to vectors to be able to swap efficiently!
-	vec** PW = new vec*[ ndom ];
-	vec** PZ = new vec*[ ndom ];
+	std::vector<arma::vec*> PW( ndom );
+	std::vector<arma::vec*> PZ( ndom );
 
 	// initialize arrays allocated above
 	for( unsigned int i = 0; i < ndom; ++i )
@@ -121,19 +118,22 @@ void ParallelSolver::solve(
 
 	numSol = vec( np );
 
-	// allocate threads
-	std::vector<std::thread> threads( ndom );
-	// generate parameters
+	// create thread pool for subdomain calculations
+	ThreadPool pool( &ParallelSolver::solveSubdomain );
+
+	// generate parameters and add them to the thread pool
 	std::vector<Params> params( ndom );
 	for( unsigned int i = 0; i < params.size(); ++i )
 	{
 		Params& p = params[ i ];
-		p.PZ = &PZ[ i ];
-		p.PW = &PW[ i ];
+		p.pz = &PZ[ i ];
+		p.pw = &PW[ i ];
 		p.M = &Mi;
 		p.l2 = l2;
 		p.dt2 = dt2;
 		p.nsteps = nsteps;
+
+		pool.addThreadArgs( &p );
 	}
 	params[ 0 ].M = &Ml;
 	params[ ndom - 1 ].M = &Mr;
@@ -141,11 +141,7 @@ void ParallelSolver::solve(
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
 		// calculate as many time steps as possible before reassociating
-		// start a thread for each calculation
-		startThreads( threads, params );
-
-		// wait for all threads to complete
-		joinThreads( threads );
+		pool.run( false );
 
 		// reassociate numerical solution
 		numSol.subvec( 0, ip * 3 / 4 - 1 ) =
@@ -200,14 +196,6 @@ void ParallelSolver::solve(
 	{
 		*error = errorL2;
 	}
-
-	delete[] PW;
-	delete[] PZ;
-	delete[] Z;
-	delete[] W;
-	delete[] F;
-	delete[] G;
-	delete[] X;
 }
 
 void ParallelSolver::genFDMatrices(
@@ -267,59 +255,14 @@ void ParallelSolver::genFDMatrices(
 	right = sp_mat( locations, values, np, np, true );
 }
 
-void ParallelSolver::startThreads(
-		std::vector<std::thread>& threads,
-		std::vector<Params>& jobQueue )
+void ParallelSolver::solveSubdomain( void* args )
 {
-	unsigned int n = 0;
-	std::mutex mutex;
-	for( unsigned int i = 0; i < threads.size(); ++i )
-	{
-		threads[ i ] = std::thread(
-				&ParallelSolver::threadJob,
-				this,
-				std::ref( jobQueue ),
-				std::ref( n ),
-				std::ref( mutex ) );
-	}
-}
-
-void ParallelSolver::threadJob(
-		std::vector<Params>& jobQueue,
-		unsigned int& curJob,
-		std::mutex& mutex )
-{
-	while( true )
-	{
-		// lock mutex to retrieve and increment current job index
-		mutex.lock();
-		unsigned int n = curJob++;
-		mutex.unlock();
-
-		// terminate thread if all jobs have been assigned
-		if( curJob >= jobQueue.size() )
-		{
-			return;
-		}
-
-		// retrieve job parameters
-		Params& params = jobQueue[ n ];
-
-		// solve with retrieved parameters
-		evalMulti(
-				*params.PZ,
-				*params.PW,
-				*params.M,
-				params.l2,
-				params.dt2,
-				params.nsteps );
-	}
-}
-
-void ParallelSolver::joinThreads( std::vector<std::thread>& threads )
-{
-	for( unsigned int i = 0; i < threads.size(); ++i )
-	{
-		threads[ i ].join();
-	}
+	Params& params = *static_cast<Params*>( args );
+	Solver::evalMulti(
+			*params.pz,
+			*params.pw,
+			*params.M,
+			params.l2,
+			params.dt2,
+			params.nsteps );
 }

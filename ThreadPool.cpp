@@ -1,12 +1,25 @@
 #include "ThreadPool.h"
 
 ThreadPool::ThreadPool()
+	: m_pFunction( NULL ), m_uiCurJobIndex( 0 )
 {
 }
 
-ThreadPool::ThreadPool( unsigned int numThreads, void( *func )( void* ) )
-	: m_pFunction( func ), m_vecThreads( numThreads )
+ThreadPool::ThreadPool( void( *func )( void* ), unsigned int numThreads )
+	: m_pFunction( func ), m_uiCurJobIndex( 0 )
 {
+	if( numThreads == 0 )
+	{
+		// choose optimal number of threads
+		numThreads = std::thread::hardware_concurrency();
+		if( numThreads == 0 )
+		{
+			// unable to determine optimal number of threads, default to 4
+			numThreads = 4;
+		}
+	}
+
+	m_vecThreads.resize( numThreads );
 }
 
 ThreadPool::~ThreadPool()
@@ -20,17 +33,38 @@ void ThreadPool::addThreadArgs( void* param )
 
 void ThreadPool::run( bool clearJobs )
 {
-	unsigned int jobsRemaining = m_vecParams.size();
-	for( unsigned int k = 0; k < m_vecParams.size(); k += m_vecThreads.size() )
+	if( m_pFunction == NULL )
 	{
-		unsigned int imax = MIN( jobsRemaining, m_vecThreads.size() );
-		for( unsigned int i = 0; i < imax; ++i )
+		return;
+	}
+	for( unsigned int i = 0; i < m_vecThreads.size(); ++i )
+	{
+		m_vecThreads[ i ] = std::thread( &ThreadPool::thread, this );
+	}
+	for( unsigned int i = 0; i < m_vecThreads.size(); ++i )
+	{
+		m_vecThreads[ i ].join();
+	}
+	if( clearJobs )
+	{
+		m_vecParams.clear();
+	}
+	m_uiCurJobIndex = 0;
+}
+
+void ThreadPool::thread()
+{
+	unsigned int jobIndex;
+	while( true )
+	{
+		m_Mutex.lock();
+		jobIndex = m_uiCurJobIndex++;
+		m_Mutex.unlock();
+		if( jobIndex >= m_vecParams.size() )
 		{
-			m_vecThreads[ i ] = std::thread( m_pFunction, m_vecParams[ i ] );
+			break;
 		}
-		for( unsigned int i = 0; i < imax; ++i )
-		{
-			m_vecThreads[ i ].join();
-		}
+
+		m_pFunction( m_vecParams[ jobIndex ] );
 	}
 }

@@ -1,17 +1,14 @@
 #pragma once
 
 #include "Solver.h"
-#include <thread>
-#include <mutex>
-#include <vector>
 
 class ParallelSolver : public Solver
 {
 private:
 	struct Params
 	{
-		arma::vec** PZ;
-		arma::vec** PW;
+		arma::vec** pz;
+		arma::vec** pw;
 		arma::sp_mat* M;
 		double l2;
 		double dt2;
@@ -35,9 +32,6 @@ public:
 		arma::vec* exactSol,
 		arma::vec* error );
 
-public:
-	static unsigned int s_uiDefaultNumThreads;
-
 private:
 	/*
 	* Generate the finite differences matrix with split off main diagonal.
@@ -49,17 +43,5 @@ private:
 			arma::sp_mat& center,
 			arma::sp_mat& right );
 
-	void startThreads(
-			std::vector<std::thread>& threads,
-			std::vector<Params>& jobQueue );
-
-	void joinThreads( std::vector<std::thread>& threads );
-
-	void threadJob(
-			std::vector<Params>& jobQueue,
-			unsigned int& curJob,
-			std::mutex& mutex );
-
-private:
-	unsigned int m_uiNumThreads;
+	static void solveSubdomain( void* args );
 };
