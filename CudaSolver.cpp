@@ -59,7 +59,8 @@ void CudaSolver::solve(
 	unsigned int fdDiags = fdOffsets.size();
 
 	// allocate memory fot the numerical solution
-	numSol = arma::vec( np );
+	// numSol = arma::vec( np );
+	numSol = arma::zeros( np );
 	// allocate memory for the analytical solution
 	arma::vec exSol( np );
 	// allocate memory for error values
@@ -80,9 +81,12 @@ void CudaSolver::solve(
 	fdOffsets.clear();
 	fdValues.clear();
 
+	errorL2( 0 ) = 0.0;
+	arma::vec errorVec( np );
+
 	// TODO: find optimal values
-	unsigned int blocks = 32;
-	unsigned int threads = ndom / blocks;
+	unsigned int threads = 32;
+	unsigned int blocks = ndom / threads;
 
 	// calculate initial values on the CUDA device
 	CudaHelper::callInitKernel(
@@ -98,8 +102,14 @@ void CudaSolver::solve(
 			d_Z,
 			d_W,
 			d_U );
-	errorL2( 0 ) = 0.0;
-	arma::vec errorVec( np );
+
+	// synchronize the solutions (exchange numerically exact parts)
+	CudaHelper::callSyncKernel(
+			blocks,
+			threads,
+			ip,
+			d_Z,
+			d_W );
 
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
@@ -123,8 +133,8 @@ void CudaSolver::solve(
 		{
 			case 1:
 				swap = d_W;
-				d_Z = d_U;
 				d_W = d_Z;
+				d_Z = d_U;
 				d_U = swap;
 				break;
 			case 2:
@@ -143,25 +153,28 @@ void CudaSolver::solve(
 				d_Z,
 				d_W );
 
-		// reassociate the solutions
-		CudaHelper::callReassociationKernel(
-				blocks,
-				threads,
-				ip,
-				d_Z,
-				d_numSol );
+		if( k == kmax - 1 )
+		{
+			// reassociate the solutions
+			CudaHelper::callReassociationKernel(
+					blocks,
+					threads,
+					ip,
+					d_Z,
+					d_numSol );
 
-		// copy the solution to host memory
-		CudaHelper::copyDevToHostMem(
-				d_numSol,
-				numSol.memptr(),
-				numSol.n_elem );
+			// copy the solution to host memory
+			CudaHelper::copyDevToHostMem(
+					d_numSol,
+					numSol.memptr(),
+					numSol.n_elem );
+		}
 
 		// calculate exact solution
 		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
+		//arrayfun2( funsol, x, 0.0, exSol );
 
 		// calculate current L2 error
-		/*
 		double err = 0.0;
 		for( unsigned int i = 0; i < exSol.size(); ++i )
 		{
@@ -169,9 +182,8 @@ void CudaSolver::solve(
 			err += locErr * locErr;
 		}
 		errorL2( k ) = sqrt( h * err );
-		*/
-		errorVec = numSol - exSol;
-		errorL2( k ) = sqrt( h * arma::dot( errorVec, errorVec ) );
+		//errorVec = numSol - exSol;
+		//errorL2( k ) = sqrt( h * arma::dot( errorVec, errorVec ) );
 
 		if( m_funOnReassociation != NULL )
 		{

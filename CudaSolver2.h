@@ -1,11 +1,13 @@
 #pragma once
+#ifdef BLUB
+
 #include "Solver.h"
 
-class CudaSolver : public Solver
+class CudaSolver2 : public Solver
 {
 public:
-	CudaSolver();
-	virtual ~CudaSolver();
+	CudaSolver2();
+	virtual ~CudaSolver2();
 
 	virtual void solve(
 		double L,
@@ -30,3 +32,5 @@ private:
 			std::vector<int>& offsets,
 			std::vector<double>& values );
 };
+
+#endif

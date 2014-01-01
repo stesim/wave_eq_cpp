@@ -105,6 +105,8 @@ void OpenClSolver::solve(
 	if( kernelInit == NULL || kernelMain == NULL || kernelReassociate == NULL )
 	{
 		std::cout << "OpenCL kernel creation failed." << std::endl;
+		std::cout << kernelInit << std::endl << kernelMain << std::endl << kernelReassociate << std::endl;
+		return;
 	}
 
 	// ND ranges

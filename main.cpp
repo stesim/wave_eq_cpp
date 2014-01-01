@@ -3,7 +3,7 @@
 #include <armadillo>
 #include <Python.h>
 #include "SerialSolver.h"
-#include "ParallelSolver.h"
+#include "ParallelSolver2.h"
 #include "WallTimer.h"
 #include "CpuTimer.h"
 #include <thread>
@@ -109,7 +109,7 @@ int main( int argc, char* argv[] )
 	{
 #if !defined(NO_CUDA) || !defined(NO_CL)
 		// device type
-		bool useGpu = inputParam<bool>( "useGpu", false );
+		bool useGpu = inputParam<bool>( "useGpu", true );
 		if( useGpu )
 		{
 #if !defined(NO_CUDA) && !defined(NO_CL)
@@ -125,10 +125,10 @@ int main( int argc, char* argv[] )
 		}
 		else
 		{
-			solver = new ParallelSolver();
+			solver = new ParallelSolver2();
 		}
 #else
-		solver = new ParallelSolver();
+		solver = new ParallelSolver2();
 #endif
 	}
 

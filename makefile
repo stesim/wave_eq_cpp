@@ -24,10 +24,10 @@ WARNCFLAGS = -Wall # -W -Wshadow -Wpointer-arith -Wbad-function-cast \
 # Warning flags for C++ programs
 WARNCXXFLAGS = $(WARNCFLAGS) -Wold-style-cast -Woverloaded-virtual
 # Debugging flags
-DBGCXXFLAGS =  # -g
+DBGCXXFLAGS =  #-g
 # Optimisation flags. Usually you should not optimise until you have finished
 # debugging, except when you want to detect dead code.
-OPTCXXFLAGS = -std=c++11 -O3 -march=native -DOPTI_MAX -DARMA_NO_DEBUG # -O2
+OPTCXXFLAGS = -std=c++11 -march=native -DOPTI_MAX -DARMA_NO_DEBUG -O3 # -O2
 
 # CXXFLAGS is used in the implicit rule for producing N.o from N.cc (or N.C)
 CXXFLAGS = $(WARNCXXFLAGS) $(DBGCXXFLAGS) $(OPTCXXFLAGS)
@@ -35,7 +35,7 @@ CXXFLAGS = $(WARNCXXFLAGS) $(DBGCXXFLAGS) $(OPTCXXFLAGS)
 # The linker flags and the libraries to link against.
 # These are used in the implicit rule for linking using a single object file;
 # we'll use them in our link rule too.
-LDFLAGS = -L/opt/cuda/lib64 -larmadillo -lpython3.3m -lOpenCL -locelot# -g
+LDFLAGS = -L/opt/cuda/lib64 -larmadillo -lpython3.3m -lOpenCL -lcudart# -g
 # Use Electric Fence to track down memory allocation problems.
 LOADLIBES = # -lefence
 
@@ -50,11 +50,17 @@ SOURCES = $(wildcard *.cpp)
 OBJECTS = $(SOURCES:.cpp=.o)
 
 NVSOURCES = CudaHelper.cu
-NVFLAGS = -I/opt/cuda/include -locelot -arch=sm_20
+NVFLAGS = -I/opt/cuda/include -lcudart -arch=sm_21 $(DBGCXXFLAGS)
 
 # The first target in the makefile is the default target. It's usually called
 # "all".
 all:	depend $(PROGRAMS)
+
+run: $(MYPROGRAM)
+	optirun ./$(MYPROGRAM)
+
+debug: $(MYPROGRAM)
+	optirun cuda-gdb ./$(MYPROGRAM)
 
 # We assume we have one program (`ourprogram') to build, from all the object
 # files derived from .cc files in the current directory.

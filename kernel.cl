@@ -21,14 +21,17 @@ inline __global double* mul_mat_vec(
 	for( unsigned int d = 0; d < num_diag; ++d )
 	{
 		// first vector index involved in the multiplication
-		unsigned int vec_index = min( 0, diag_offset[ d ] );
+		unsigned int vec_index = max( 0, diag_offset[ d ] );
+		// first result vector index
+		unsigned int res_index = max( 0, -diag_offset[ d ] );
 		// number of elements in the current diagonal
 		unsigned int diag_size = n - abs( diag_offset[ d ] );
 		for( unsigned int i = 0; i < diag_size; ++i )
 		{
-			res[ vec_index ] += values[ i ] * vec[ vec_index ];
+			res[ res_index ] += values[ i ] * vec[ vec_index ];
 			// increment vector index after each multiplication
 			++vec_index;
+			++res_index;
 		}
 		// increment 'values' pointer to next diagonal
 		values += diag_size;

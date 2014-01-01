@@ -2,6 +2,8 @@
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
+#include <iostream>
+
 #define RUNTIME_CUDA
 #include "wave_eq_func.h"
 
@@ -19,18 +21,21 @@ double* diaMulVec(
 	{
 		res[ i ] = 0.0;
 	}
+	unsigned int totalDiagOffset = 0;
 	for( unsigned int k = 0; k < diaDiags; ++k )
 	{
 		// determine first vector index involved in the diagonal multiplication
-		unsigned int vecIndex = fmin( 0.0, diaOffsets[ k ] );
+		unsigned int vecIndex = max( 0, diaOffsets[ k ] );
+		// determine first result vector index
+		unsigned int resIndex = max( 0, -diaOffsets[ k ] );
 		// detemine the number of elements in the diagonal
 		unsigned int diagSize = n - abs( diaOffsets[ k ] );
 		for( unsigned int i = 0; i < diagSize; ++i )
 		{
-			res[ vecIndex + i ] += diaValues[ i ] * vec[ vecIndex + i ];
+			res[ resIndex + i ] += diaValues[ totalDiagOffset + i ] * vec[ vecIndex + i ];
 		}
 		// increment values pointer to next diagonal
-		diaValues += diagSize;
+		totalDiagOffset += diagSize;
 	}
 	return res;
 }
@@ -83,7 +88,7 @@ void mainKernel(
 	double* w = &W[ vecIndex ];
 	double* u = &U[ vecIndex ];
 
-	double a = 2 * ( 1 - l2 );
+	double a = 2.0 * ( 1.0 - l2 );
 	double* swap;
 	for( unsigned int i = 0; i < nsteps; ++i )
 	{
@@ -92,7 +97,7 @@ void mainKernel(
 		// u = u + a * z = M * z + a * z
 		vecAddScaledVec( ip, u, a, z );
 		// u = u + (-w) = M * z + a * z - w
-		vecAddScaledVec( ip, u, -1.0, z );
+		vecAddScaledVec( ip, u, -1.0, w );
 
 		// shuffle buffers to avoid copying
 		swap = w;
@@ -130,7 +135,7 @@ void initKernel(
 		u[ i ] = funu1( x );
 	}
 
-	double a = 1 - dt / h * dt / h;
+	double a = 1.0 - dt / h * dt / h;
 	// z = M * w
 	diaMulVec( ip, fdDiags, fdOffsets, fdValues, w, z );
 	// z = 0.5 * z + a * w = 0.5 * M * w + a * w
@@ -174,19 +179,27 @@ void syncKernel(
 	// copy exact data from left neighbors
 	double* nz = &Z[ leftNeighbor * ip ];
 	double* nw = &W[ leftNeighbor * ip ];
+	memcpy( &z[ 0 ], &nz[ ip / 2 ], ip / 4 * sizeof( double ) );
+	memcpy( &w[ 0 ], &nw[ ip / 2 ], ip / 4 * sizeof( double ) );
+	/*
 	for( unsigned int i = 0; i < ip / 4; ++i )
 	{
 		z[ i ] = nz[ ip / 2 + i ];
 		w[ i ] = nw[ ip / 2 + i ];
 	}
+	*/
 	// copy exact data from right neighbors
 	nz = &Z[ rightNeighbor * ip ];
 	nw = &W[ rightNeighbor * ip ];
+	memcpy( &z[ ip * 3 / 4 ], &nz[ ip / 4 ], ip / 4 * sizeof( double ) );
+	memcpy( &w[ ip * 3 / 4 ], &nw[ ip / 4 ], ip / 4 * sizeof( double ) );
+	/*
 	for( unsigned int i = 0; i < ip / 4; ++i )
 	{
 		z[ ip * 3 / 4 + i ] = nz[ ip / 4 + i ];
 		w[ ip * 3 / 4 + i ] = nw[ ip / 4 + i ];
 	}
+	*/
 }
 
 __global__
@@ -201,10 +214,13 @@ void reassociationKernel(
 	double* s = &S[ vecIndex / 2 ];
 
 	// copy left half of the subdomain solution
+	memcpy( s, z, ip / 2 * sizeof( double ) );
+	/*
 	for( unsigned int i = 0; i < ip / 2; ++i )
 	{
-		s[ i ] = z[ i ];
+		s[ ip * id / 2 + i ] = z[ ip * id / 2 + i ];
 	}
+	*/
 }
 
 void CudaHelper::callMainKernel(
@@ -290,7 +306,10 @@ T* CudaHelper::allocDevMem( size_t numElem )
 template<typename T>
 void CudaHelper::freeDevMem( T* mem )
 {
-	cudaFree( mem );
+
+#define ERR_TEST(a) if(a!=cudaSuccess){std::cout << "cudaFree failed!." << std::endl;}
+	
+	ERR_TEST(cudaFree( mem ));
 }
 
 template<typename T>
@@ -328,4 +347,3 @@ template void CudaHelper::copyHostToDevMem<double>( const double*, double*, size
 
 template void CudaHelper::copyDevToHostMem<int>( const int*, int*, size_t );
 template void CudaHelper::copyDevToHostMem<double>( const double*, double*, size_t );
-
