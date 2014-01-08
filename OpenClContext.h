@@ -14,6 +14,61 @@ public:
 
 	bool isInitialized();
 
+	/*
+	 * Allocate device memory.
+	 */
+	template<typename T>
+	cl_mem allocDevMem( size_t numElem )
+	{
+		return clCreateBuffer(
+				context,
+				CL_MEM_READ_WRITE,
+				numElem * sizeof( T ),
+				nullptr,
+				nullptr );
+	}
+
+	/*
+	 * Free device memory.
+	 */
+	void freeDevMem( cl_mem mem );
+
+	/*
+	 * Copy host memory to device memory.
+	 */
+	template<typename T>
+	void copyHostToDevMem( const T* hostMem, cl_mem devMem, size_t numElem )
+	{
+		clEnqueueWriteBuffer(
+				queue,
+				devMem,
+				true,
+				0,
+				numElem * sizeof( T ),
+				const_cast<T*>( hostMem ),
+				0,
+				nullptr,
+				nullptr );
+	}
+
+	/*
+	 * Copy device memory to host memory.
+	 */
+	template<typename T>
+	void copyDevToHostMem( cl_mem devMem, T* hostMem, size_t numElem )
+	{
+		clEnqueueReadBuffer(
+				queue,
+				devMem,
+				true,
+				0,
+				numElem * sizeof( T ),
+				hostMem,
+				0,
+				nullptr,
+				nullptr );
+	}
+
 public:
 	cl_context context;
 	cl_device_id device;

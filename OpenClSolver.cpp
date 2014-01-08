@@ -12,6 +12,11 @@ OpenClSolver::OpenClSolver()
 	{
 		s_clContext.initialize();
 	}
+
+	m_KernelInit = createClKernel( "kernelInit" );
+	m_KernelMain = createClKernel( "kernelMain" );
+	m_KernelSync = createClKernel( "kernelSync" );
+	m_KernelReassociate = createClKernel( "kernelReassociate" );
 }
 
 OpenClSolver::~OpenClSolver()
@@ -31,6 +36,196 @@ void OpenClSolver::solve(
 		arma::vec* exactSol,
 		arma::vec* error )
 {
+	// number of points
+	unsigned int np = 1 << N;
+	// number of disjoint subdomains (= number of processors/threads)
+	unsigned int ns = 1 << n;
+	// number of overlapping subdomains
+	unsigned int ndom = 2 * ns;
+	// points per subdomain
+	unsigned int ip = np / ns;
+	// time steps between solution reassociations
+	unsigned int nsteps = ip / 2;
+
+	// spacial discretization
+	x = arma::linspace( -L, L, np );
+	// discretization spacing
+	double h = 2.0 * L / ( np - 1 );
+
+	// temporal discretization step size
+	double dt = h / 4.0;
+	// helper variables
+	double dt2 = dt * dt;
+	double l = dt / h;
+	double l2 = l * l;
+
+	// total number of reassociations
+	unsigned int kmax =
+		static_cast<unsigned int>( ceil( T / ( nsteps * dt ) ) );
+
+	// generate finite differences matrix
+	std::vector<int> fdOffsets;
+	std::vector<double> fdValues;
+	createSparseDiagFDMatrix( ip, l2, fdOffsets, fdValues );
+	unsigned int fdDiags = fdOffsets.size();
+
+	// allocate memory fot the numerical solution
+	// numSol = arma::vec( np );
+	numSol = arma::zeros( np );
+	// allocate memory for the analytical solution
+	arma::vec exSol( np );
+	// allocate memory for error values
+	arma::vec errorL2( kmax );
+
+	// allocate arrays required by the kernels on device memory
+	cl_mem d_fdOffsets = s_clContext.allocDevMem<int>( fdOffsets.size() );
+	cl_mem d_fdValues = s_clContext.allocDevMem<double>( fdValues.size() );
+	cl_mem d_Z = s_clContext.allocDevMem<double>( ndom * ip );
+	cl_mem d_W = s_clContext.allocDevMem<double>( ndom * ip );
+	cl_mem d_U = s_clContext.allocDevMem<double>( ndom * ip );
+	cl_mem d_numSol = s_clContext.allocDevMem<double>( numSol.n_elem );
+
+	// copy FD matrix to device memory
+	s_clContext.copyHostToDevMem( &fdOffsets[ 0 ], d_fdOffsets, fdOffsets.size() );
+	s_clContext.copyHostToDevMem( &fdValues[ 0 ], d_fdValues, fdValues.size() );
+	// free FD matrix host memory
+	fdOffsets.clear();
+	fdValues.clear();
+
+	errorL2( 0 ) = 0.0;
+	arma::vec errorVec( np );
+
+	// TODO: find optimal values
+	unsigned int threads = 32;
+	unsigned int blocks = ndom / threads;
+
+	// calculate initial values on the CUDA device
+	callInitKernel(
+			blocks,
+			threads,
+			ip,
+			L,
+			h,
+			dt,
+			fdDiags,
+			d_fdOffsets,
+			d_fdValues,
+			d_Z,
+			d_W,
+			d_U );
+
+	// synchronize the solutions (exchange numerically exact parts)
+	callSyncKernel(
+			blocks,
+			threads,
+			ip,
+			d_Z,
+			d_W );
+
+	clFinish( s_clContext.queue );
+
+	for( unsigned int k = 0; k < kmax; ++k )
+	{
+		// calculate 'nsteps' iterations
+		callMainKernel(
+				blocks,
+				threads,
+				ip,
+				nsteps,
+				l2,
+				fdDiags,
+				d_fdOffsets,
+				d_fdValues,
+				d_Z,
+				d_W,
+				d_U );
+
+		// shuffle the buffers to mirror the shuffling inside the kernel
+		cl_mem swap;
+		switch( nsteps % 3 )
+		{
+			case 1:
+				swap = d_W;
+				d_W = d_Z;
+				d_Z = d_U;
+				d_U = swap;
+				break;
+			case 2:
+				swap = d_Z;
+				d_Z = d_W;
+				d_W = d_U;
+				d_U = swap;
+				break;
+		}
+
+		// synchronize the solutions (exchange numerically exact parts)
+		callSyncKernel(
+				blocks,
+				threads,
+				ip,
+				d_Z,
+				d_W );
+
+		//if( k == kmax - 1 )
+		//{
+			// reassociate the solutions
+			callReassociationKernel(
+					blocks,
+					threads,
+					ip,
+					d_Z,
+					d_numSol );
+
+			clFinish( s_clContext.queue );
+
+			// copy the solution to host memory
+			s_clContext.copyDevToHostMem(
+					d_numSol,
+					numSol.memptr(),
+					numSol.n_elem );
+		//}
+
+		// calculate exact solution
+		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
+		//arrayfun2( funsol, x, 0.0, exSol );
+
+		// calculate current L2 error
+		double err = 0.0;
+		for( unsigned int i = 0; i < exSol.size(); ++i )
+		{
+			double locErr = numSol( i ) - exSol( i );
+			err += locErr * locErr;
+		}
+		errorL2( k ) = sqrt( h * err );
+		//errorVec = numSol - exSol;
+		//errorL2( k ) = sqrt( h * arma::dot( errorVec, errorVec ) );
+
+		if( m_funOnReassociation != NULL )
+		{
+			m_funOnReassociation( k, kmax, x, numSol, exSol, errorL2( k ) );
+		}
+	}
+
+	// return analytical solution and L2 error if necessary
+	if( exactSol != NULL )
+	{
+		*exactSol = exSol;
+	}
+	if( error != NULL )
+	{
+		*error = errorL2;
+	}
+
+	// free device resources
+	s_clContext.freeDevMem( d_fdOffsets );
+	s_clContext.freeDevMem( d_fdValues );
+	s_clContext.freeDevMem( d_Z );
+	s_clContext.freeDevMem( d_W );
+	s_clContext.freeDevMem( d_U );
+	s_clContext.freeDevMem( d_numSol );
+
+
+/*
 	// number of points
 	unsigned int np = 1 << N;
 	// number of (overlapping) subdomains (= number of processors/threads)
@@ -251,6 +446,7 @@ void OpenClSolver::solve(
 	{
 		*error = errorL2;
 	}
+*/
 }
 
 void OpenClSolver::createSparseDiagFDMatrix(

@@ -211,4 +211,9 @@ bool OpenClContext::isInitialized()
 	return m_bInitialized;
 }
 
+void OpenClContext::freeDevMem( cl_mem mem )
+{
+	clReleaseMemObject( mem );
+}
+
 #endif
