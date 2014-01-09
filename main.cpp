@@ -113,7 +113,7 @@ int main( int argc, char* argv[] )
 		if( useGpu )
 		{
 #if !defined(NO_CUDA) && !defined(NO_CL)
-			bool useCuda = inputParam<bool>( "useCuda", true );
+			bool useCuda = inputParam<bool>( "useCuda", false );
 			solver = useCuda
 				? static_cast<Solver*>( new CudaSolver() )
 				: static_cast<Solver*>( new OpenClSolver() );

@@ -96,7 +96,7 @@ void OpenClSolver::solve(
 	arma::vec errorVec( np );
 
 	// TODO: find optimal values
-	unsigned int threads = 32;
+	unsigned int threads = 4; // GPU: 4; CPU: 8
 	unsigned int blocks = ndom / threads;
 
 	// calculate initial values on the CUDA device
@@ -121,8 +121,6 @@ void OpenClSolver::solve(
 			ip,
 			d_Z,
 			d_W );
-
-	clFinish( s_clContext.queue );
 
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
@@ -166,8 +164,8 @@ void OpenClSolver::solve(
 				d_Z,
 				d_W );
 
-		//if( k == kmax - 1 )
-		//{
+		if( k == kmax - 1 )
+		{
 			// reassociate the solutions
 			callReassociationKernel(
 					blocks,
@@ -176,14 +174,12 @@ void OpenClSolver::solve(
 					d_Z,
 					d_numSol );
 
-			clFinish( s_clContext.queue );
-
 			// copy the solution to host memory
 			s_clContext.copyDevToHostMem(
 					d_numSol,
 					numSol.memptr(),
 					numSol.n_elem );
-		//}
+		}
 
 		// calculate exact solution
 		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );

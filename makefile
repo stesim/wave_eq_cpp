@@ -24,7 +24,7 @@ WARNCFLAGS = -Wall # -W -Wshadow -Wpointer-arith -Wbad-function-cast \
 # Warning flags for C++ programs
 WARNCXXFLAGS = $(WARNCFLAGS) -Wold-style-cast -Woverloaded-virtual
 # Debugging flags
-DBGCXXFLAGS =  #-g
+DBGCXXFLAGS = # -g
 # Optimisation flags. Usually you should not optimise until you have finished
 # debugging, except when you want to detect dead code.
 OPTCXXFLAGS = -std=c++11 -march=native -DOPTI_MAX -DARMA_NO_DEBUG -O3 # -O2

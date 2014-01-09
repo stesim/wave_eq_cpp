@@ -160,7 +160,7 @@ private:
 		clSetKernelArg( m_KernelInit, 7, sizeof( cl_mem ), &Z );
 		clSetKernelArg( m_KernelInit, 8, sizeof( cl_mem ), &W );
 		clSetKernelArg( m_KernelInit, 9, sizeof( cl_mem ), &U );
-		clEnqueueNDRangeKernel(
+		cl_int err = clEnqueueNDRangeKernel(
 				s_clContext.queue,
 				m_KernelInit,
 				1,
@@ -170,6 +170,11 @@ private:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "callInitKernel() error " << err << std::endl;
+		}
 	}
 
 	/*
@@ -200,7 +205,7 @@ private:
 		clSetKernelArg( m_KernelMain, 6, sizeof( cl_mem ), &Z );
 		clSetKernelArg( m_KernelMain, 7, sizeof( cl_mem ), &W );
 		clSetKernelArg( m_KernelMain, 8, sizeof( cl_mem ), &U );
-		clEnqueueNDRangeKernel(
+		cl_int err = clEnqueueNDRangeKernel(
 				s_clContext.queue,
 				m_KernelMain,
 				1,
@@ -210,6 +215,11 @@ private:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "callMainKernel() error " << err << std::endl;
+		}
 	}
 
 	/*
@@ -229,7 +239,7 @@ private:
 		clSetKernelArg( m_KernelSync, 0, sizeof( unsigned int ), &ip );
 		clSetKernelArg( m_KernelSync, 1, sizeof( cl_mem ), &Z );
 		clSetKernelArg( m_KernelSync, 2, sizeof( cl_mem ), &W );
-		clEnqueueNDRangeKernel(
+		cl_int err = clEnqueueNDRangeKernel(
 				s_clContext.queue,
 				m_KernelSync,
 				1,
@@ -239,6 +249,11 @@ private:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "callSyncKernel() error " << err << std::endl;
+		}
 	}
 
 	/*
@@ -255,10 +270,10 @@ private:
 		size_t globalWorkSize = blocks * threads;
 		size_t localWorkSize = threads;
 
-		clSetKernelArg( m_KernelSync, 0, sizeof( unsigned int ), &ip );
-		clSetKernelArg( m_KernelSync, 1, sizeof( cl_mem ), &Z );
-		clSetKernelArg( m_KernelSync, 2, sizeof( cl_mem ), &S );
-		clEnqueueNDRangeKernel(
+		clSetKernelArg( m_KernelReassociate, 0, sizeof( unsigned int ), &ip );
+		clSetKernelArg( m_KernelReassociate, 1, sizeof( cl_mem ), &Z );
+		clSetKernelArg( m_KernelReassociate, 2, sizeof( cl_mem ), &S );
+		cl_int err = clEnqueueNDRangeKernel(
 				s_clContext.queue,
 				m_KernelReassociate,
 				1,
@@ -268,6 +283,11 @@ private:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "callReassociationKernel() error " << err << std::endl;
+		}
 	}
 
 private:

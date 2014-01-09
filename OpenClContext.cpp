@@ -18,6 +18,11 @@ OpenClContext::~OpenClContext()
 	}
 }
 
+void CL_CALLBACK err_callback( const char* err, const void*, size_t, void* )
+{
+	std::cout << "OpenCL Error: " << err << std::endl;
+}
+
 void OpenClContext::initialize()
 {
 	// get number of OpenCL platforms
@@ -119,7 +124,7 @@ void OpenClContext::initialize()
 	}
 
 	// create OpenCL context
-	context = clCreateContext( NULL, 1, &device, NULL, NULL, NULL );
+	context = clCreateContext( NULL, 1, &device, err_callback, NULL, NULL );
 
 	/*
 	// read kernel file

@@ -2,6 +2,7 @@
 #ifndef NO_CL
 
 #include <CL/cl.h>
+#include <iostream>
 
 class OpenClContext
 {
@@ -39,7 +40,7 @@ public:
 	template<typename T>
 	void copyHostToDevMem( const T* hostMem, cl_mem devMem, size_t numElem )
 	{
-		clEnqueueWriteBuffer(
+		cl_int err = clEnqueueWriteBuffer(
 				queue,
 				devMem,
 				true,
@@ -49,6 +50,11 @@ public:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "copyHostToDevMem() error " << err << std::endl;
+		}
 	}
 
 	/*
@@ -57,7 +63,7 @@ public:
 	template<typename T>
 	void copyDevToHostMem( cl_mem devMem, T* hostMem, size_t numElem )
 	{
-		clEnqueueReadBuffer(
+		cl_int err = clEnqueueReadBuffer(
 				queue,
 				devMem,
 				true,
@@ -67,6 +73,11 @@ public:
 				0,
 				nullptr,
 				nullptr );
+
+		if( err != CL_SUCCESS )
+		{
+			std::cout << "copyDevToHostMem() error " << err << std::endl;
+		}
 	}
 
 public:
