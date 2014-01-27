@@ -148,7 +148,7 @@ void OpenClContext::initialize()
 			NULL );
 
 	// compile OpenCL program for the selected device
-	cl_int err = clBuildProgram( program, 1, &device, "-I.", NULL, NULL );
+	cl_int err = clBuildProgram( program, 1, &device, NULL/*"-I."*/, NULL, NULL );
 	// print build log in case of failure
 	if( err != CL_SUCCESS )
 	{

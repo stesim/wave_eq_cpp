@@ -514,7 +514,13 @@ bool OpenClSolver::checkClCapabilities( unsigned int np, unsigned int ns )
 
 cl_kernel OpenClSolver::createClKernel( const char* name )
 {
-	return clCreateKernel( s_clContext.program, name, NULL );
+	cl_int err;
+	cl_kernel ker = clCreateKernel( s_clContext.program, name, &err );
+	if( err != CL_SUCCESS )
+	{
+		std::cout << "createClKernel() error " << err << std::endl;
+	}
+	return ker;
 }
 
 #endif

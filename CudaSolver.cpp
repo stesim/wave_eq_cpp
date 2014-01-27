@@ -171,7 +171,7 @@ void CudaSolver::solve(
 		}
 
 		// calculate exact solution
-		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
+		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt + dt, exSol );
 		//arrayfun2( funsol, x, 0.0, exSol );
 
 		// calculate current L2 error

@@ -73,7 +73,7 @@ void SerialSolver::solve(
 	for( unsigned int k = 0; k < kmax; ++k )
 	{
 		evalMulti( pz, pw, M, l2, dt2, nsteps );
-		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt, exSol );
+		arrayfun2( funsol, x, ( k + 1 ) * nsteps * dt + dt, exSol );
 		// *pz == z is not necessarily true, thus the solution vector is *pz
 		errorVec = *pz - exSol;
 		errorL2( k ) = sqrt( h * dot( errorVec, errorVec ) );
